@@ -19,7 +19,8 @@ def Attention(query_shape, key_shape, value_shape, mask_shape):
     qk = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1], transpose_b = True))([query, key]);
     depth = tf.keras.layers.Lambda(lambda x: tf.cast(tf.shape(x)[-1], dtype = tf.float32))(key);
     logits = tf.keras.layers.Lambda(lambda x: x[0] / tf.math.sqrt(x[1]))([qk, depth]);
-    logits = tf.keras.layers.Add()([logits, mask * -1e9]);
+    weighted_mask = tf.keras.layers.Lambda(lambda x: x * -1e9)(mask);
+    logits = tf.keras.layers.Add()([logits, weighted_mask]);
     # attention.shape = (batch, num_heads, seq_length, seq_length)
     attention = tf.keras.layers.Softmax()(logits);
     # attended value
@@ -105,4 +106,5 @@ if __name__ == "__main__":
     
     assert tf.executing_eagerly();
     attention = MultiHeadAttention(10, 50, 30, 30, 100, 10);
+    attention.save('attention.h5');
     encoding = PositionalEncoding((10,5));
