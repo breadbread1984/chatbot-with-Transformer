@@ -4,23 +4,23 @@ import tensorflow as tf;
 
 def Attention(query_shape, key_shape, value_shape):
 
-    # the inputs tensor.shape = (batch, seq_length, num_heads, depth, 1)
-    tf.debugging.Assert(tf.math.logical_and(tf.equal(tf.shape(query_shape)[-1], 4), tf.equal(query_shape[-1], 1)), [query_shape]);
-    tf.debugging.Assert(tf.math.logical_and(tf.equal(tf.shape(key_shape)[-1], 4), tf.equal(key_shape[-1], 1)), [key_shape]);
-    tf.debugging.Assert(tf.math.logical_and(tf.equal(tf.shape(value_shape)[-1], 4), tf.equal(key_shape[-1], 1)), [value_shape]);
-    # length of key vector equals to that of value vector.
-    tf.debugging.Assert(tf.equal(key_shape[-2],value_shape[-2]), [key_shape, value_shape]);
+    # the inputs tensor.shape = (batch, num_heads, seq_length, depth)
+    tf.debugging.Assert(tf.equal(tf.shape(query_shape)[-1], 3), [query_shape]);
+    tf.debugging.Assert(tf.equal(tf.shape(key_shape)[-1], 3), [key_shape]);
+    tf.debugging.Assert(tf.equal(tf.shape(value_shape)[-1], 3), [value_shape]);
     # inputs
     query = tf.keras.Input(query_shape);
     key = tf.keras.Input(key_shape);
     value = tf.keras.Input(value_shape);
     # normalized outer product of query and key.
-    # logits.shape = (batch, seq_length, num_heads, query_size = depth, key_size = depth)
-    logits = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1], transpose_b = True) / tf.math.sqrt(tf.cast(tf.shape(x[1])[-1], dtype = tf.float32)))([query, key]);
-    # attention.shape = (batch, seq_length, num_heads, query_size = depth, key_size = depth)
+    # logits.shape = (batch, num_heads, seq_length, seq_length)
+    qk = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1], transpose_b = True))([query, key]);
+    depth = tf.keras.layers.Lambda(lambda x: tf.cast(tf.shape(x)[-1], dtype = tf.float32))(key);
+    logits = tf.keras.layers.Lambda(lambda x: x[0] / tf.math.sqrt(x[1]))([qk, depth]);
+    # attention.shape = (batch, num_heads, seq_length, seq_length)
     attention = tf.keras.layers.Softmax()(logits);
     # attended value
-    # results.shape = (batch, seq_length, num_heads, query_size, 1)
+    # results.shape = (batch, num_heads, seq_length, depth)
     results = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1]))([attention, value]);
     return tf.keras.Model(inputs = (query, key, value), outputs = results);
 
@@ -42,12 +42,16 @@ def MultiHeadAttention(seq_length, query_dim, key_dim, value_dim, d_model, num_h
     query_dense = tf.keras.layers.Dense(units = d_model)(query);
     key_dense = tf.keras.layers.Dense(units = d_model)(key);
     value_dense = tf.keras.layers.Dense(units = d_model)(value);
-    # splitted.shape = (batch, seq_length, num_heads, depth, 1)
-    query_splitted = tf.keras.layers.Reshape((seq_length, num_heads, d_model // num_heads, 1))(query_dense);
-    key_splitted = tf.keras.layers.Reshape((seq_length, num_heads, d_model // num_heads, 1))(key_dense);
-    value_splitted = tf.keras.layers.Reshape((seq_length, num_heads, d_model // num_heads, 1))(value_dense);
-    # attention.shape = (batch, seq_length, num_heads, depth, 1)
+    # splitted.shape = (batch, num_heads, seq_length, depth)
+    query_splitted = tf.keras.layers.Reshape((seq_length, num_heads, d_model // num_heads))(query_dense);
+    query_splitted = tf.keras.layers.Lambda(lambda x: tf.transpose(x, (0, 2, 1, 3)))(query_splitted);
+    key_splitted = tf.keras.layers.Reshape((seq_length, num_heads, d_model // num_heads))(key_dense);
+    ker_splitted = tf.keras.layers.Lambda(lambda x: tf.transpose(x, (0, 2, 1, 3)))(key_splitted);
+    value_splitted = tf.keras.layers.Reshape((seq_length, num_heads, d_model // num_heads))(value_dense);
+    value_splitted = tf.keras.layers.Lambda(lambda x: tf.transpose(x, (0, 2, 1, 3)))(value_splitted);
+    # attention.shape = (batch, seq_length, num_heads, depth)
     attended = Attention(query_splitted.shape[1:], key_splitted.shape[1:], value_splitted.shape[1:])([query_splitted, key_splitted, value_splitted]);
+    attended = tf.keras.layers.Lambda(lambda x: tf.transpose(x, (0, 2, 1, 3)))(attended);
     # concated.shape = (batch, seq_length, d_model)
     concated = tf.keras.layers.Reshape((seq_length, d_model))(attended);
     # results.shape = (batch, seq_length, d_model)
@@ -85,9 +89,10 @@ def PositionalEncoding(input_shape):
     results = tf.keras.layers.Add()([inputs, pos_encoding]);
     return tf.keras.Model(inputs = inputs, outputs = results);
 
-def Encoder():
+def Encoder(seq_length_max, d_model, num_heads, internal_dim, dropout_rate):
     
-    pass
+    inputs = tf.keras.Input((seq_length_max, d_model));
+    padding_mask = tf.keras.Input(());
 
 def Transformer():
     
