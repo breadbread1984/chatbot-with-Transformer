@@ -2,25 +2,20 @@
 
 import tensorflow as tf;
 
-def Attention(query_shape, key_shape, value_shape, mask_shape):
+def Attention(seq_length, d_model, num_heads):
 
-    # the inputs tensor.shape = (batch, num_heads, seq_length, depth)
-    tf.debugging.Assert(tf.equal(tf.shape(query_shape)[-1], 3), [query_shape]);
-    tf.debugging.Assert(tf.equal(tf.shape(key_shape)[-1], 3), [key_shape]);
-    tf.debugging.Assert(tf.equal(tf.shape(value_shape)[-1], 3), [value_shape]);
-    tf.debugging.Assert(tf.equal(tf.shape(mask_shape)[-1], 3), [mask_shape]);
     # inputs
-    query = tf.keras.Input(query_shape);
-    key = tf.keras.Input(key_shape);
-    value = tf.keras.Input(value_shape);
-    mask = tf.keras.Input(mask_shape);
+    query = tf.keras.Input((num_heads, seq_length, d_model // num_heads));
+    key = tf.keras.Input((num_heads, seq_length, d_model // num_heads));
+    value = tf.keras.Input((num_heads, seq_length, d_model // num_heads));
+    mask = tf.keras.Input((1, 1, seq_length));
     # normalized outer product of query and key.
     # logits.shape = (batch, num_heads, seq_length, seq_length)
     qk = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1], transpose_b = True))([query, key]);
     depth = tf.keras.layers.Lambda(lambda x: tf.cast(tf.shape(x)[-1], dtype = tf.float32))(key);
     logits = tf.keras.layers.Lambda(lambda x: x[0] / tf.math.sqrt(x[1]))([qk, depth]);
-    weighted_mask = tf.keras.layers.Lambda(lambda x: x * -1e9)(mask);
-    logits = tf.keras.layers.Add()([logits, weighted_mask]);
+    neg_infinite = tf.keras.layers.Lambda(lambda x, num_heads, seq_length: tf.tile(x * -1e9, (1, num_heads, seq_length, 1)), arguments = {'num_heads':num_heads,'seq_length':seq_length})(mask);
+    logits = tf.keras.layers.Add()([logits, neg_infinite]);
     # attention.shape = (batch, num_heads, seq_length, seq_length)
     attention = tf.keras.layers.Softmax()(logits);
     # attended value
@@ -55,7 +50,7 @@ def MultiHeadAttention(seq_length, query_dim, key_dim, value_dim, d_model, num_h
     value_splitted = tf.keras.layers.Reshape((seq_length, num_heads, d_model // num_heads))(value_dense);
     value_splitted = tf.keras.layers.Lambda(lambda x: tf.transpose(x, (0, 2, 1, 3)))(value_splitted);
     # attention.shape = (batch, seq_length, num_heads, depth)
-    attended = Attention(query_splitted.shape[1:], key_splitted.shape[1:], value_splitted.shape[1:], mask.shape[1:])([query_splitted, key_splitted, value_splitted, mask]);
+    attended = Attention(seq_length, d_model, num_heads)([query_splitted, key_splitted, value_splitted, mask]);
     attended = tf.keras.layers.Lambda(lambda x: tf.transpose(x, (0, 2, 1, 3)))(attended);
     # concated.shape = (batch, seq_length, d_model)
     concated = tf.keras.layers.Reshape((seq_length, d_model))(attended);
@@ -89,7 +84,7 @@ def PositionalEncoding(input_shape):
     # pos_encoding.shape = (seq_length_max, d_model)
     pos_encoding = tf.keras.layers.Concatenate()([sines,cosines]);
     # add batch dim
-    pos_encoding = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x,0))(pos_encoding);
+    pos_encoding = tf.keras.layers.Lambda(lambda x, batch: tf.tile(tf.expand_dims(x,0), (batch, 1, 1)), arguments = {'batch': tf.shape(inputs)[0]})(pos_encoding);
     # add pos encoding to embedding
     results = tf.keras.layers.Add()([inputs, pos_encoding]);
     return tf.keras.Model(inputs = inputs, outputs = results);
