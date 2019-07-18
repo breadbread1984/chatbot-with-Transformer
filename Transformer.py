@@ -16,10 +16,9 @@ def Attention(seq_length, d_model, num_heads):
     qk = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1], transpose_b = True))([query, key]);
     depth = tf.keras.layers.Lambda(lambda x: tf.cast(tf.shape(x)[-1], dtype = tf.float32))(key);
     logits = tf.keras.layers.Lambda(lambda x: x[0] / tf.math.sqrt(x[1]))([qk, depth]);
-    neg_infinite = tf.keras.layers.Lambda(lambda x, num_heads, seq_length: tf.tile(x * -1e9, (1, num_heads, seq_length / tf.shape(x)[2], 1)), arguments = {'num_heads':num_heads,'seq_length':seq_length})(mask);
-    logits = tf.keras.layers.Add()([logits, neg_infinite]);
+    masked_logits = tf.keras.layers.Lambda(lambda x: x[0] + x[1] * -1e9)((logits, mask));
     # attention.shape = (batch, num_heads, seq_length, seq_length)
-    attention = tf.keras.layers.Softmax()(logits);
+    attention = tf.keras.layers.Softmax()(masked_logits);
     # attended value
     # results.shape = (batch, num_heads, seq_length, depth)
     results = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1]))([attention, value]);
@@ -161,7 +160,7 @@ def Decoder(vocab_size, num_layers, seq_length, d_model, num_heads, code_dim, dr
         outputs = DecoderLayer(seq_length, d_model, num_heads, code_dim, dropout_rate)([outputs, code, look_ahead_mask, padding_mask]);
     return tf.keras.Model(inputs = (inputs, code, look_ahead_mask, padding_mask), outputs = outputs);
 
-def Transformer():
+def Transformer(vocab_size, num_layers, seq_length, d_model, num_heads, code_dim, dropout_rate):
     
     pass;
 
