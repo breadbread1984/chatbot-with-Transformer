@@ -58,40 +58,37 @@ def MultiHeadAttention(seq_length, query_dim, key_dim, value_dim, d_model, num_h
     results = tf.keras.layers.Dense(units = d_model)(concated);
     return tf.keras.Model(inputs = (query, key, value, mask), outputs = results);
 
-def PositionalEncoding(input_shape):
+def PositionalEncoding(seq_length, d_model):
     
-    tf.debugging.Assert(tf.equal(tf.shape(input_shape), 2), [input_shape]);
-    seq_length_max = tf.cast(input_shape[0], dtype = tf.float32);
-    d_model = tf.cast(input_shape[1], dtype = tf.float32);
-    inputs = tf.keras.Input(input_shape);
-    # positions.shape = (seq_length_max, 1)
-    positions = tf.keras.layers.Lambda(lambda x: tf.expand_dims(tf.range(x, dtype = tf.float32),1))(seq_length_max);
+    inputs = tf.keras.Input((seq_length, d_model));
+    # positions.shape = (seq_length, 1)
+    positions = tf.keras.layers.Lambda(lambda x: tf.expand_dims(tf.range(tf.cast(tf.shape(x)[1], dtype = tf.float32), dtype = tf.float32),1))(inputs);
     # j.shape = (1, d_model)
-    j = tf.keras.layers.Lambda(lambda x: tf.expand_dims(tf.range(x, dtype = tf.float32),0))(d_model);
+    j = tf.keras.layers.Lambda(lambda x: tf.expand_dims(tf.range(tf.cast(tf.shape(x)[2], dtype = tf.float32), dtype = tf.float32),0))(inputs);
     # j (which is 2 * i if j is even or 2 * i + 1 if j is odd) is the index in d_model
     # i.shape = (1, d_model)
-    i = tf.keras.layers.Lambda(lambda x: tf.math.round(tf.math.divide(x,2)))(j);
+    i = tf.keras.layers.Lambda(lambda x: x // 2)(j);
     # power = 2 * i / d_model
     # power.shape = (1, d_model)
-    power = tf.keras.layers.Lambda(lambda x: 2 * x[0] / tf.cast(x[1], dtype = tf.float32))((i, d_model));
+    power = tf.keras.layers.Lambda(lambda x: 2 * x[0] / tf.cast(tf.shape(x[1])[2], dtype = tf.float32))((i, inputs));
     # angle = position / (10000^power)
-    # angle.shape = (seq_length_max, d_model)
-    angles = tf.keras.layers.Lambda(lambda x: x[0] / tf.math.pow(10000,x[1]))((positions,power));
-    # sines.shape = (seq_length_max, d_model / 2)
+    # angle.shape = (seq_length, d_model)
+    angles = tf.keras.layers.Lambda(lambda x: x[0] / tf.math.pow(10000.,x[1]))((positions,power));
+    # sines.shape = (seq_length, d_model / 2)
     sines = tf.keras.layers.Lambda(lambda x: tf.math.sin(x[:,0::2]))(angles);
-    # cosines.shape = (seq_length_max, d_model / 2)
+    # cosines.shape = (seq_length, d_model / 2)
     cosines = tf.keras.layers.Lambda(lambda x: tf.math.cos(x[:,1::2]))(angles);
-    # pos_encoding.shape = (seq_length_max, d_model)
+    # pos_encoding.shape = (seq_length, d_model)
     pos_encoding = tf.keras.layers.Concatenate()([sines,cosines]);
     # add batch dim
-    pos_encoding = tf.keras.layers.Lambda(lambda x, batch: tf.tile(tf.expand_dims(x,0), (batch, 1, 1)), arguments = {'batch': tf.shape(inputs)[0]})(pos_encoding);
+    pos_encoding = tf.keras.layers.Lambda(lambda x: tf.tile(tf.expand_dims(x[0],0), (tf.shape(x[1])[0], 1, 1)))((pos_encoding, inputs));
     # add pos encoding to embedding
     results = tf.keras.layers.Add()([inputs, pos_encoding]);
     return tf.keras.Model(inputs = inputs, outputs = results);
 
-def Encoder(seq_length_max, d_model, num_heads, internal_dim, dropout_rate):
+def Encoder(seq_length, d_model, num_heads, internal_dim, dropout_rate):
     
-    inputs = tf.keras.Input((seq_length_max, d_model));
+    inputs = tf.keras.Input((seq_length, d_model));
 
 def Transformer():
     
@@ -102,4 +99,5 @@ if __name__ == "__main__":
     assert tf.executing_eagerly();
     attention = MultiHeadAttention(10, 50, 30, 30, 100, 10);
     attention.save('attention.h5');
-    encoding = PositionalEncoding((10,5));
+    encoding = PositionalEncoding(10,100);
+    encoding.save('encoding.h5');
