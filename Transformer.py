@@ -10,13 +10,13 @@ def Attention(seq_length, d_model, num_heads):
     query = tf.keras.Input((num_heads, seq_length, d_model // num_heads));
     key = tf.keras.Input((num_heads, seq_length, d_model // num_heads));
     value = tf.keras.Input((num_heads, seq_length, d_model // num_heads));
-    mask = tf.keras.Input((1, 1, seq_length));
+    mask = tf.keras.Input((1, None, seq_length));
     # normalized outer product of query and key.
     # logits.shape = (batch, num_heads, seq_length, seq_length)
     qk = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1], transpose_b = True))([query, key]);
     depth = tf.keras.layers.Lambda(lambda x: tf.cast(tf.shape(x)[-1], dtype = tf.float32))(key);
     logits = tf.keras.layers.Lambda(lambda x: x[0] / tf.math.sqrt(x[1]))([qk, depth]);
-    neg_infinite = tf.keras.layers.Lambda(lambda x, num_heads, seq_length: tf.tile(x * -1e9, (1, num_heads, seq_length, 1)), arguments = {'num_heads':num_heads,'seq_length':seq_length})(mask);
+    neg_infinite = tf.keras.layers.Lambda(lambda x, num_heads, seq_length: tf.tile(x * -1e9, (1, num_heads, seq_length / tf.shape(x)[2], 1)), arguments = {'num_heads':num_heads,'seq_length':seq_length})(mask);
     logits = tf.keras.layers.Add()([logits, neg_infinite]);
     # attention.shape = (batch, num_heads, seq_length, seq_length)
     attention = tf.keras.layers.Softmax()(logits);
@@ -35,7 +35,7 @@ def MultiHeadAttention(seq_length, d_model, num_heads):
     query = tf.keras.Input((seq_length,d_model));
     key = tf.keras.Input((seq_length,d_model));
     value = tf.keras.Input((seq_length,d_model));
-    mask = tf.keras.Input((1,1,seq_length));
+    mask = tf.keras.Input((1, None, seq_length));
     # dense.shape = (batch, seq_length, d_model)
     query_dense = tf.keras.layers.Dense(units = d_model)(query);
     key_dense = tf.keras.layers.Dense(units = d_model)(key);
@@ -118,6 +118,33 @@ def Encoder(vocab_size, num_layers, seq_length, d_model, num_heads, code_dim, dr
         outputs = EncoderLayer(seq_length, d_model, num_heads, code_dim, dropout_rate)([outputs, mask]);
     return tf.keras.Model(inputs = (inputs, mask), outputs = outputs);
 
+def DecoderLayer(seq_length, d_model, num_heads, code_dim, dropout_rate):
+    
+    # d_model must be divisible by num_heads.
+    tf.debugging.Assert(tf.equal(d_model % num_heads,0),[d_model, num_heads]);
+    # inputs
+    inputs = tf.keras.Input((seq_length, d_model));
+    code = tf.keras.Input((seq_length, d_model));
+    look_ahead_mask = tf.keras.Input((1, seq_length, seq_length));
+    padding_mask = tf.keras.Input((1, 1, seq_length));
+    
+    attention1 = MultiHeadAttention(seq_length, d_model, num_heads)([inputs, inputs, inputs, look_ahead_mask]);
+    attention1_inputs = tf.keras.layers.Add()([attention1, inputs]);
+    attention1 = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(attention1_inputs);
+    
+    attention2 = MultiHeadAttention(seq_length, d_model, num_heads)([attention1, code, code, padding_mask]);
+    attention2 = tf.keras.layers.Dropout(rate = dropout_rate)(attention2);
+    attention2_attention1 = tf.keras.layers.Add()([attention2, attention1]);
+    attention2 = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(attention2_attention1);
+    
+    outputs = tf.keras.layers.Dense(units = code_dim, activation = 'relu')(attention2);
+    outputs = tf.keras.layers.Dense(units = d_model)(outputs);
+    outputs = tf.keras.layers.Dropout(rate = dropout_rate)(outputs);
+    outputs_attention2 = tf.keras.layers.Add()([outputs, attention2]);
+    outputs = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(outputs_attention2);
+    
+    return tf.keras.Model(inputs = (inputs, code, look_ahead_mask, padding_mask), outputs = outputs);
+
 def Transformer():
     
     pass;
@@ -127,3 +154,5 @@ if __name__ == "__main__":
     assert tf.executing_eagerly();
     encoder = Encoder(100, 5, 10, 100, 10, 100, 0.5);
     encoder.save('encoder.h5');
+    decoder = DecoderLayer(10, 100, 10, 100, 0.5);
+    decoder.save('decoder.h5');
