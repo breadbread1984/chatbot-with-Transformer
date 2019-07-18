@@ -23,20 +23,16 @@ def Attention(seq_length, d_model, num_heads):
     results = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1]))([attention, value]);
     return tf.keras.Model(inputs = (query, key, value, mask), outputs = results);
 
-def MultiHeadAttention(seq_length, query_dim, key_dim, value_dim, d_model, num_heads):
+def MultiHeadAttention(seq_length, d_model, num_heads):
     
-    # query.shape = (batch, seq_length, query_dim)
-    # key.shape = (batch, seq_length, key_dim)
-    # value.shape = (batch, seq_length, value_dim)
-    assert type(seq_length) is int;
-    assert type(query_dim) is int;
-    assert type(key_dim) is int;
-    assert type(value_dim) is int;
+    # query.shape = (batch, seq_length, d_model)
+    # key.shape = (batch, seq_length, d_model)
+    # value.shape = (batch, seq_length, d_model)
     # d_model must be divisible by num_heads.
     tf.debugging.Assert(tf.equal(d_model % num_heads,0),[d_model, num_heads]);
-    query = tf.keras.Input((seq_length,query_dim));
-    key = tf.keras.Input((seq_length,key_dim));
-    value = tf.keras.Input((seq_length,value_dim));
+    query = tf.keras.Input((seq_length,d_model));
+    key = tf.keras.Input((seq_length,d_model));
+    value = tf.keras.Input((seq_length,d_model));
     mask = tf.keras.Input((1,1,seq_length));
     # dense.shape = (batch, seq_length, d_model)
     query_dense = tf.keras.layers.Dense(units = d_model)(query);
@@ -86,9 +82,21 @@ def PositionalEncoding(seq_length, d_model):
     results = tf.keras.layers.Add()([inputs, pos_encoding]);
     return tf.keras.Model(inputs = inputs, outputs = results);
 
-def Encoder(seq_length, d_model, num_heads, internal_dim, dropout_rate):
+def Encoder(seq_length, d_model, num_heads, code_dim, dropout_rate):
     
     inputs = tf.keras.Input((seq_length, d_model));
+    mask = tf.keras.Input((1, 1, seq_length));
+    # attended.shape = (batch, seq_length, d_model)
+    attended = MultiHeadAttention(seq_length, d_model, num_heads)([inputs, inputs, inputs, mask]);
+    attended = tf.keras.layers.Dropout(rate = dropout_rate)(attended);
+    inputs_attended = tf.keras.layers.Add()([inputs, attended]);
+    attended = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(inputs_attended);
+    outputs = tf.keras.layers.Dense(units = code_dim, activation = 'relu')(attended);
+    outputs = tf.keras.layers.Dense(units = d_model)(outputs);
+    outputs = tf.keras.layers.Dropout(rate = dropout_rate)(outputs);
+    attended_outputs = tf.keras.layers.Add()([attended, outputs]);
+    outputs = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(attended_outputs);
+    return tf.keras.Model(inputs = (inputs, mask), outputs = outputs);
 
 def Transformer():
     
@@ -97,7 +105,7 @@ def Transformer():
 if __name__ == "__main__":
     
     assert tf.executing_eagerly();
-    attention = MultiHeadAttention(10, 50, 30, 30, 100, 10);
-    attention.save('attention.h5');
     encoding = PositionalEncoding(10,100);
     encoding.save('encoding.h5');
+    encoder = Encoder(10, 100, 10, 100, 0.5);
+    encoder.save('encoder.h5');
