@@ -82,7 +82,7 @@ def PositionalEncoding(seq_length, d_model):
     results = tf.keras.layers.Add()([inputs, pos_encoding]);
     return tf.keras.Model(inputs = inputs, outputs = results);
 
-def Encoder(seq_length, d_model, num_heads, code_dim, dropout_rate):
+def EncoderLayer(seq_length, d_model, num_heads, code_dim, dropout_rate):
     
     inputs = tf.keras.Input((seq_length, d_model));
     mask = tf.keras.Input((1, 1, seq_length));
@@ -98,6 +98,18 @@ def Encoder(seq_length, d_model, num_heads, code_dim, dropout_rate):
     outputs = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(attended_outputs);
     return tf.keras.Model(inputs = (inputs, mask), outputs = outputs);
 
+def Encoder(vocab_size, num_layers, seq_length, d_model, num_heads, code_dim, dropout_rate):
+    
+    inputs = tf.keras.Input((seq_length,));
+    mask = tf.keras.Input((1, 1, seq_length));
+    embeddings = tf.keras.layers.Embedding(vocab_size, d_model)(inputs);
+    embeddings = tf.keras.layers.Lambda(lambda x, d_model: tf.math.sqrt(tf.cast(d_model, dtype = tf.float32)) * x, arguments = {'d_model': d_model})(embeddings);
+    embeddings = PositionalEncoding(seq_length, d_model)(embeddings);
+    outputs = tf.keras.layers.Dropout(rate = dropout_rate)(embeddings);
+    for i in range(num_layers):
+        outputs = EncoderLayer(seq_length, d_model, num_heads, code_dim, dropout_rate)([outputs, mask]);
+    return tf.keras.Model(inputs = (inputs, mask), outputs = outputs);
+
 def Transformer():
     
     pass;
@@ -105,7 +117,5 @@ def Transformer():
 if __name__ == "__main__":
     
     assert tf.executing_eagerly();
-    encoding = PositionalEncoding(10,100);
-    encoding.save('encoding.h5');
-    encoder = Encoder(10, 100, 10, 100, 0.5);
+    encoder = Encoder(100, 5, 10, 100, 10, 100, 0.5);
     encoder.save('encoder.h5');
