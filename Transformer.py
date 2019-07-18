@@ -145,6 +145,22 @@ def DecoderLayer(seq_length, d_model, num_heads, code_dim, dropout_rate):
     
     return tf.keras.Model(inputs = (inputs, code, look_ahead_mask, padding_mask), outputs = outputs);
 
+def Decoder(vocab_size, num_layers, seq_length, d_model, num_heads, code_dim, dropout_rate):
+    
+    # d_model must be divisible by num_heads.
+    tf.debugging.Assert(tf.equal(d_model % num_heads,0),[d_model, num_heads]);
+    inputs = tf.keras.Input((seq_length,));
+    code = tf.keras.Input((seq_length, d_model));
+    look_ahead_mask = tf.keras.Input((1, seq_length, seq_length));
+    padding_mask = tf.keras.Input((1, 1, seq_length));
+    embeddings = tf.keras.layers.Embedding(vocab_size, d_model)(inputs);
+    embeddings = tf.keras.layers.Lambda(lambda x, d_model: tf.math.sqrt(tf.cast(d_model, dtype = tf.float32)) * x, arguments = {'d_model': d_model})(embeddings);
+    embeddings = PositionalEncoding(seq_length, d_model)(embeddings);
+    outputs = tf.keras.layers.Dropout(rate = dropout_rate)(embeddings);
+    for i in range(num_layers):
+        outputs = DecoderLayer(seq_length, d_model, num_heads, code_dim, dropout_rate)([outputs, code, look_ahead_mask, padding_mask]);
+    return tf.keras.Model(inputs = (inputs, code, look_ahead_mask, padding_mask), outputs = outputs);
+
 def Transformer():
     
     pass;
@@ -154,5 +170,5 @@ if __name__ == "__main__":
     assert tf.executing_eagerly();
     encoder = Encoder(100, 5, 10, 100, 10, 100, 0.5);
     encoder.save('encoder.h5');
-    decoder = DecoderLayer(10, 100, 10, 100, 0.5);
+    decoder = Decoder(100, 5, 10, 100, 10, 100, 0.5);
     decoder.save('decoder.h5');
