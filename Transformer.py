@@ -4,6 +4,8 @@ import tensorflow as tf;
 
 def Attention(seq_length, d_model, num_heads):
 
+    # d_model must be divisible by num_heads.
+    tf.debugging.Assert(tf.equal(d_model % num_heads,0),[d_model, num_heads]);
     # inputs
     query = tf.keras.Input((num_heads, seq_length, d_model // num_heads));
     key = tf.keras.Input((num_heads, seq_length, d_model // num_heads));
@@ -84,6 +86,9 @@ def PositionalEncoding(seq_length, d_model):
 
 def EncoderLayer(seq_length, d_model, num_heads, code_dim, dropout_rate):
     
+    # d_model must be divisible by num_heads.
+    tf.debugging.Assert(tf.equal(d_model % num_heads,0),[d_model, num_heads]);
+    # inputs
     inputs = tf.keras.Input((seq_length, d_model));
     mask = tf.keras.Input((1, 1, seq_length));
     # attended.shape = (batch, seq_length, d_model)
@@ -99,7 +104,10 @@ def EncoderLayer(seq_length, d_model, num_heads, code_dim, dropout_rate):
     return tf.keras.Model(inputs = (inputs, mask), outputs = outputs);
 
 def Encoder(vocab_size, num_layers, seq_length, d_model, num_heads, code_dim, dropout_rate):
-    
+
+    # d_model must be divisible by num_heads.
+    tf.debugging.Assert(tf.equal(d_model % num_heads,0),[d_model, num_heads]);
+    # inputs
     inputs = tf.keras.Input((seq_length,));
     mask = tf.keras.Input((1, 1, seq_length));
     embeddings = tf.keras.layers.Embedding(vocab_size, d_model)(inputs);
