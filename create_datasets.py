@@ -9,8 +9,6 @@ import tensorflow_datasets as tfds;
 MAX_SAMPLES = 50000;
 # Maximum sentence length
 MAX_LENGTH = 40;
-BATCH_SIZE = 64;
-BUFFER_SIZE = 20000;
 
 def create_datasets():
     
@@ -48,14 +46,6 @@ def create_datasets():
             'outputs': answers[:, 1:]
         },
     ));
-    dataset = dataset.cache();
-    dataset = dataset.shuffle(BUFFER_SIZE);
-    dataset = dataset.batch(BATCH_SIZE);
-    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE);
-    
-    print(dataset);
-
-    tokenizer.save_to_file('tokenizer');    
     return dataset, tokenizer;
 
 def preprocess_sentence(sentence):
