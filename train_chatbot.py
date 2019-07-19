@@ -27,7 +27,7 @@ def main():
     for epoch in range(EPOCHS):
         for (inputs,outputs) in dataset:
             with tf.GradientTape() as tape:
-                pred = model(inputs['inputs'], inputs['dec_inputs']);
+                pred = model([inputs['inputs'], inputs['dec_inputs']]);
                 loss = loss_function(outputs['outputs'], pred);
                 avg_loss.update_state(loss);
             # write log
