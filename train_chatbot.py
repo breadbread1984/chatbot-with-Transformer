@@ -21,9 +21,26 @@ def main():
     print('training model...');
     learning_rate = CustomSchedule(D_MODEL);
     optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1 = 0.9, beta_2 = 0.98, epsilon = 1e-9);
-    model.compile(optimizer = optimizer, loss = loss_function, metrics = [accuracy]);
-    model.fit(dataset, epochs = EPOCHS);
-    model.save('transformer.h5');
+    
+    log = tf.summary.create_file_writer('checkpoints');
+    avg_loss = tf.keras.metrics.Mean(name = 'loss', dtype = tf.float32);
+    for epoch in range(EPOCHS):
+        for (inputs,outputs) in dataset:
+            with tf.GradientTape() as tape:
+                pred = model(inputs[0], inputs[1]);
+                loss = loss_function(outputs, pred);
+                avg_loss.update_state(loss);
+            # write log
+            if tf.equal(optimizer.iterations % 100, 0):
+                with log.as_default():
+                    tf.summary.scalar('loss', avg_loss.result(), step = optimizer.iterations);
+                    tf.summary.scalar('accuracy', accuracy(outputs, pred), step = optimizer.iterations);
+                print('Step #%d Loss: %.6f' % (optimizer.iteration, avg_loss.results()));
+                avg_loss.reset_states();
+            grads = tape.gradient(loss, model.trainable_variables);
+            optimizer.apply_gradients(zip(grads, model.trainable_variables));
+        # save model once every epoch
+        model.save('checkpoints/transformer_%d.h5' % optimizer.iterations);
 
 def loss_function(y_true, y_pred):
     y_true = tf.reshape(y_true, shape=(-1, MAX_LENGTH - 1))
