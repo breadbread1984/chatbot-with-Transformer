@@ -167,14 +167,20 @@ def Decoder(vocab_size, num_layers, d_model, num_heads, code_dim, dropout_rate):
         outputs = DecoderLayer(d_model, num_heads, code_dim, dropout_rate)([outputs, code, look_ahead_mask, padding_mask]);
     return tf.keras.Model(inputs = (inputs, code, look_ahead_mask, padding_mask), outputs = outputs);
 
-def Transformer(vocab_size, num_layers, seq_length, d_model, num_heads, code_dim, dropout_rate):
+def Transformer(vocab_size, num_layers = 2, d_model = 256, num_heads = 8, code_dim = 512, dropout_rate = 0.1):
     
-    pass;
+    inputs = tf.keras.Input((None,));
+    dec_inputs = tf.keras.Input((None,));
+    enc_padding_mask = tf.keras.layers.Lambda(lambda x: tf.zeros((1,1,tf.shape(x)[0])))(inputs);
+    look_ahead_mask = tf.keras.layers.Lambda(lambda x: tf.zeros((1,tf.shape(x)[0],tf.shape(x)[0])))(inputs);
+    dec_padding_mask = tf.keras.layers.Lambda(lambda x: tf.zeros((1,1,tf.shape(x)[0])))(inputs);
+    code = Encoder(vocab_size, num_layers, d_model, num_heads, code_dim, dropout_rate)([inputs, enc_padding_mask]);
+    decoded = Decoder(vocab_size, num_heads, d_model, num_heads, code_dim, dropout_rate)([dec_inputs, code, look_ahead_mask, dec_padding_mask]);
+    outputs = tf.keras.layers.Dense(units = vocab_size)(decoded);
+    return tf.keras.Model(inputs = (inputs, dec_inputs), outputs = outputs);
 
 if __name__ == "__main__":
     
     assert tf.executing_eagerly();
-    encoder = Encoder(100, 5, 100, 10, 100, 0.5);
-    encoder.save('encoder.h5');
-    decoder = Decoder(100, 5, 100, 10, 100, 0.5);
-    decoder.save('decoder.h5');
+    transformer = Transformer(100);
+    transformer.save('transformer.h5');
