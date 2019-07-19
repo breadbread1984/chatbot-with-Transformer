@@ -27,14 +27,14 @@ def main():
     for epoch in range(EPOCHS):
         for (inputs,outputs) in dataset:
             with tf.GradientTape() as tape:
-                pred = model(inputs[0], inputs[1]);
-                loss = loss_function(outputs, pred);
+                pred = model(inputs['inputs'], inputs['dec_inputs']);
+                loss = loss_function(outputs['outputs'], pred);
                 avg_loss.update_state(loss);
             # write log
             if tf.equal(optimizer.iterations % 100, 0):
                 with log.as_default():
                     tf.summary.scalar('loss', avg_loss.result(), step = optimizer.iterations);
-                    tf.summary.scalar('accuracy', accuracy(outputs, pred), step = optimizer.iterations);
+                    tf.summary.scalar('accuracy', accuracy(outputs['outputs'], pred), step = optimizer.iterations);
                 print('Step #%d Loss: %.6f' % (optimizer.iteration, avg_loss.results()));
                 avg_loss.reset_states();
             grads = tape.gradient(loss, model.trainable_variables);
