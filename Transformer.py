@@ -45,7 +45,7 @@ def MultiHeadAttention(d_model, num_heads):
     query_splitted = tf.keras.layers.Reshape((-1, num_heads, d_model // num_heads))(query_dense);
     query_splitted = tf.keras.layers.Lambda(lambda x: tf.transpose(x, (0, 2, 1, 3)))(query_splitted);
     key_splitted = tf.keras.layers.Reshape((-1, num_heads, d_model // num_heads))(key_dense);
-    ker_splitted = tf.keras.layers.Lambda(lambda x: tf.transpose(x, (0, 2, 1, 3)))(key_splitted);
+    key_splitted = tf.keras.layers.Lambda(lambda x: tf.transpose(x, (0, 2, 1, 3)))(key_splitted);
     value_splitted = tf.keras.layers.Reshape((-1, num_heads, d_model // num_heads))(value_dense);
     value_splitted = tf.keras.layers.Lambda(lambda x: tf.transpose(x, (0, 2, 1, 3)))(value_splitted);
     # attention.shape = (batch, seq_length, num_heads, depth)
