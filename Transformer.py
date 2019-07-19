@@ -167,13 +167,26 @@ def Decoder(vocab_size, num_layers, d_model, num_heads, code_dim, dropout_rate):
         outputs = DecoderLayer(d_model, num_heads, code_dim, dropout_rate)([outputs, code, look_ahead_mask, padding_mask]);
     return tf.keras.Model(inputs = (inputs, code, look_ahead_mask, padding_mask), outputs = outputs);
 
+def create_padding_mask(x):
+    mask = tf.cast(tf.math.equal(x, 0), tf.float32);
+    mask = tf.expand_dims(tf.expand_dims(mask, 1), 1);
+    # (batch_size, 1, 1, sequence length)
+    return mask;
+
+def create_look_ahead_mask(x):
+    seq_len = tf.shape(x)[1];
+    look_ahead_mask = 1 - tf.linalg.band_part(tf.ones((seq_len, seq_len)), -1, 0);
+    padding_mask = create_padding_mask(x);
+    return tf.maximum(look_ahead_mask, padding_mask);
+
 def Transformer(vocab_size, num_layers = 2, d_model = 256, num_heads = 8, code_dim = 512, dropout_rate = 0.1):
     
     inputs = tf.keras.Input((None,));
     dec_inputs = tf.keras.Input((None,));
-    enc_padding_mask = tf.keras.layers.Lambda(lambda x: tf.zeros((1,1,tf.shape(x)[0])))(inputs);
-    look_ahead_mask = tf.keras.layers.Lambda(lambda x: tf.zeros((1,tf.shape(x)[0],tf.shape(x)[0])))(inputs);
-    dec_padding_mask = tf.keras.layers.Lambda(lambda x: tf.zeros((1,1,tf.shape(x)[0])))(inputs);
+    # enc_padding_mask.shape = (batch, 1, 1, seq_length)
+    enc_padding_mask = tf.keras.layers.Lambda(create_padding_mask)(inputs);
+    look_ahead_mask = tf.keras.layers.Lambda(create_look_ahead_mask)(inputs);
+    dec_padding_mask = tf.keras.layers.Lambda(create_padding_mask)(inputs);
     code = Encoder(vocab_size, num_layers, d_model, num_heads, code_dim, dropout_rate)([inputs, enc_padding_mask]);
     decoded = Decoder(vocab_size, num_heads, d_model, num_heads, code_dim, dropout_rate)([dec_inputs, code, look_ahead_mask, dec_padding_mask]);
     outputs = tf.keras.layers.Dense(units = vocab_size)(decoded);
