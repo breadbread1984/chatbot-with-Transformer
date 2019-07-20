@@ -103,6 +103,7 @@ def EncoderLayer(d_model, num_heads, code_dim, dropout_rate):
     outputs = tf.keras.layers.Dense(units = d_model)(outputs);
     outputs = tf.keras.layers.Dropout(rate = dropout_rate)(outputs);
     attended_outputs = tf.keras.layers.Add()([attended, outputs]);
+    # outputs.shape = (batch, seq_length, d_model)
     outputs = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(attended_outputs);
     return tf.keras.Model(inputs = (inputs, mask), outputs = outputs);
 
@@ -146,6 +147,7 @@ def DecoderLayer(d_model, num_heads, code_dim, dropout_rate):
     outputs = tf.keras.layers.Dense(units = d_model)(outputs);
     outputs = tf.keras.layers.Dropout(rate = dropout_rate)(outputs);
     outputs_attention2 = tf.keras.layers.Add()([outputs, attention2]);
+    # outputs.shape = (batch, seq_length, d_model)
     outputs = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(outputs_attention2);
     
     return tf.keras.Model(inputs = (inputs, code, look_ahead_mask, padding_mask), outputs = outputs);
@@ -191,6 +193,7 @@ def Transformer(vocab_size, num_layers = 2, d_model = 256, num_heads = 8, code_d
     dec_padding_mask = tf.keras.layers.Lambda(create_padding_mask)(inputs);
     code = Encoder(vocab_size, num_layers, d_model, num_heads, code_dim, dropout_rate)([inputs, enc_padding_mask]);
     decoded = Decoder(vocab_size, num_heads, d_model, num_heads, code_dim, dropout_rate)([dec_inputs, code, look_ahead_mask, dec_padding_mask]);
+    # outputs.shape = (batch, seq_length, vocab_size)
     outputs = tf.keras.layers.Dense(units = vocab_size)(decoded);
     return tf.keras.Model(inputs = (inputs, dec_inputs), outputs = outputs);
 
