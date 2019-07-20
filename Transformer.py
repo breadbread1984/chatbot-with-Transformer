@@ -92,11 +92,13 @@ def EncoderLayer(d_model, num_heads, code_dim, dropout_rate):
     # inputs
     inputs = tf.keras.Input((None, d_model));
     mask = tf.keras.Input((1, 1, None));
+    # multi-head attention
     # attended.shape = (batch, seq_length, d_model)
     attended = MultiHeadAttention(d_model, num_heads)([inputs, inputs, inputs, mask]);
     attended = tf.keras.layers.Dropout(rate = dropout_rate)(attended);
     inputs_attended = tf.keras.layers.Add()([inputs, attended]);
     attended = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(inputs_attended);
+    # feed forward network
     outputs = tf.keras.layers.Dense(units = code_dim, activation = 'relu')(attended);
     outputs = tf.keras.layers.Dense(units = d_model)(outputs);
     outputs = tf.keras.layers.Dropout(rate = dropout_rate)(outputs);
@@ -130,16 +132,16 @@ def DecoderLayer(d_model, num_heads, code_dim, dropout_rate):
     look_ahead_mask = tf.keras.Input((1, None, None));
     # padding_mask.shape = (batch, 1, 1, seq_length)
     padding_mask = tf.keras.Input((1, 1, None));
-    
+    # multi-head attention
     attention1 = MultiHeadAttention(d_model, num_heads)([inputs, inputs, inputs, look_ahead_mask]);
     attention1_inputs = tf.keras.layers.Add()([attention1, inputs]);
     attention1 = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(attention1_inputs);
-    
+    # multi-head attention
     attention2 = MultiHeadAttention(d_model, num_heads)([attention1, code, code, padding_mask]);
     attention2 = tf.keras.layers.Dropout(rate = dropout_rate)(attention2);
     attention2_attention1 = tf.keras.layers.Add()([attention2, attention1]);
     attention2 = tf.keras.layers.LayerNormalization(epsilon = 1e-6)(attention2_attention1);
-    
+    # feed ward network
     outputs = tf.keras.layers.Dense(units = code_dim, activation = 'relu')(attention2);
     outputs = tf.keras.layers.Dense(units = d_model)(outputs);
     outputs = tf.keras.layers.Dropout(rate = dropout_rate)(outputs);
