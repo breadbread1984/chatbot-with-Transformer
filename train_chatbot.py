@@ -35,7 +35,7 @@ def main():
                 with log.as_default():
                     tf.summary.scalar('loss', avg_loss.result(), step = optimizer.iterations);
                     tf.summary.scalar('accuracy', accuracy(outputs['outputs'], pred), step = optimizer.iterations);
-                print('Step #%d Loss: %.6f' % (optimizer.iterations, avg_loss.results()));
+                print('Step #%d Loss: %.6f' % (optimizer.iterations, avg_loss.result()));
                 avg_loss.reset_states();
             grads = tape.gradient(loss, model.trainable_variables);
             optimizer.apply_gradients(zip(grads, model.trainable_variables));
