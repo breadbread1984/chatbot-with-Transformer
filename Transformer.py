@@ -6,34 +6,36 @@ def Attention(d_model, num_heads):
 
     # d_model must be divisible by num_heads.
     tf.debugging.Assert(tf.equal(d_model % num_heads,0),[d_model, num_heads]);
-    # inputs
+    # query.shape = (batch, seq_length(inputs), d_model)
     query = tf.keras.Input((num_heads, None, d_model // num_heads));
+    # key.shape = (batch, seq_length(inputs or dec_inputs), d_model)
     key = tf.keras.Input((num_heads, None, d_model // num_heads));
+    # value.shape = (batch, seq_length(inputs or dec_inputs), d_model)
     value = tf.keras.Input((num_heads, None, d_model // num_heads));
     # mask.shape = (1, seq_length, seq_length) or (1, 1, seq_length)
     mask = tf.keras.Input((1, None, None));
-    # normalized outer product of query and key.
-    # logits.shape = (batch, num_heads, seq_length, seq_length)
+    # masked_logits is correlation matrix between inputs and dec_inputs
+    # masked_logits.shape = (batch, num_heads, seq_length(inputs), seq_length(inputs or dec_inputs))
     qk = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1], transpose_b = True))([query, key]);
     depth = tf.keras.layers.Lambda(lambda x: tf.cast(tf.shape(x)[-1], dtype = tf.float32))(key);
     logits = tf.keras.layers.Lambda(lambda x: x[0] / tf.math.sqrt(x[1]))([qk, depth]);
     masked_logits = tf.keras.layers.Lambda(lambda x: x[0] + x[1] * -1e9)((logits, mask));
-    # attention.shape = (batch, num_heads, seq_length, seq_length)
+    # attention.shape = (batch, num_heads, seq_length(inputs), seq_length(inputs or dec_inputs))
     attention = tf.keras.layers.Softmax()(masked_logits);
     # attended value
-    # results.shape = (batch, num_heads, seq_length, depth)
+    # results.shape = (batch, num_heads, seq_length(inputs), depth)
     results = tf.keras.layers.Lambda(lambda x: tf.linalg.matmul(x[0], x[1]))([attention, value]);
     return tf.keras.Model(inputs = (query, key, value, mask), outputs = results);
 
 def MultiHeadAttention(d_model, num_heads):
     
-    # query.shape = (batch, seq_length, d_model)
-    # key.shape = (batch, seq_length, d_model)
-    # value.shape = (batch, seq_length, d_model)
     # d_model must be divisible by num_heads.
     tf.debugging.Assert(tf.equal(d_model % num_heads,0),[d_model, num_heads]);
+    # query.shape = (batch, seq_length(inputs), d_model)
     query = tf.keras.Input((None,d_model));
+    # key.shape = (batch, seq_length(inputs or dec_inputs), d_model)
     key = tf.keras.Input((None,d_model));
+    # value.shape = (batch, seq_length(inputs or dec_inputs), d_model)
     value = tf.keras.Input((None,d_model));
     # mask.shape = (1, seq_length, seq_length) or (1, 1, seq_length)
     mask = tf.keras.Input((1, None, None));
@@ -126,7 +128,8 @@ def DecoderLayer(d_model, num_heads, code_dim, dropout_rate):
     
     # d_model must be divisible by num_heads.
     tf.debugging.Assert(tf.equal(d_model % num_heads,0),[d_model, num_heads]);
-    # inputs
+    # inputs.shape = (batch, seq_length(dec_inputs), d_model)
+    # code.shape = (batch, seq_length(inputs), d_model);
     inputs = tf.keras.Input((None, d_model));
     code = tf.keras.Input((None, d_model));
     # look_ahead_mask.shape = (batch, 1, seq_length, seq_length)
