@@ -185,7 +185,7 @@ def Transformer(vocab_size, num_layers = 2, d_model = 256, num_heads = 8, code_d
     dec_inputs = tf.keras.Input((None,));
     # enc_padding_mask.shape = (batch, 1, 1, seq_length)
     enc_padding_mask = tf.keras.layers.Lambda(create_padding_mask)(inputs);
-    look_ahead_mask = tf.keras.layers.Lambda(create_look_ahead_mask)(inputs);
+    look_ahead_mask = tf.keras.layers.Lambda(create_look_ahead_mask)(dec_inputs);
     dec_padding_mask = tf.keras.layers.Lambda(create_padding_mask)(inputs);
     code = Encoder(vocab_size, num_layers, d_model, num_heads, code_dim, dropout_rate)([inputs, enc_padding_mask]);
     decoded = Decoder(vocab_size, num_heads, d_model, num_heads, code_dim, dropout_rate)([dec_inputs, code, look_ahead_mask, dec_padding_mask]);
