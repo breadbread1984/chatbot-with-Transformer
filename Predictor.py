@@ -3,14 +3,15 @@
 import tensorflow as tf;
 import tensorflow_datasets as tfds;
 from create_datasets import preprocess_sentence;
+from Transformer import create_padding_mask, create_look_ahead_mask;
 
 class Predictor(object):
 
     MAX_LENGTH = 40;
 
-    def __init__(self, model_path = 'checkpoints/transformer_80000.h5', tokenizer_prefix = 'tokenizer'):
+    def __init__(self, model_path = 'checkpoints/transformer_13780.h5', tokenizer_prefix = 'tokenizer'):
 
-        self.transformer = tf.keras.models.load_model(model_path);
+        self.transformer = tf.keras.models.load_model(model_path, custom_objects = {'tf': tf, 'create_padding_mask': create_padding_mask, 'create_look_ahead_mask': create_look_ahead_mask});
         self.tokenizer = tfds.features.text.SubwordTextEncoder.load_from_file(tokenizer_prefix);
         self.start_token, self.end_token = [self.tokenizer.vocab_size], [self.tokenizer.vocab_size + 1];
 
@@ -31,7 +32,7 @@ class Predictor(object):
             predictions = self.transformer([sentence, output]);
             # use the output sentence's last token
             # predictions.shape = (batch = 1, vocab_size)
-            predictions = predictions[:.-1,:];
+            predictions = predictions[:,-1:,:];
             token_id = tf.cast(tf.argmax(predictions, axis = -1), dtype = tf.int32);
             # stop when end token is predicted
             if tf.equal(token_id, self.end_token[0]): break;
@@ -46,3 +47,6 @@ if __name__ == "__main__":
 
     assert tf.executing_eagerly();
     predictor = Predictor();
+    reply = predictor.predict('How are you?');
+    print(reply);
+
