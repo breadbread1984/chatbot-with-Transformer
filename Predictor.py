@@ -47,6 +47,8 @@ if __name__ == "__main__":
 
     assert tf.executing_eagerly();
     predictor = Predictor();
-    reply = predictor.predict('How are you?');
-    print(reply);
+    while True:
+        ask = raw_input('say something: ');
+        reply = predictor.predict(ask);
+        print(reply);
 
