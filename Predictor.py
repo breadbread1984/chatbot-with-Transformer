@@ -3,7 +3,6 @@
 import tensorflow as tf;
 import tensorflow_datasets as tfds;
 from create_datasets import preprocess_sentence;
-from Transformer import create_padding_mask, create_look_ahead_mask;
 
 class Predictor(object):
 
@@ -11,7 +10,7 @@ class Predictor(object):
 
     def __init__(self, model_path = 'checkpoints/transformer_13780.h5', tokenizer_prefix = 'tokenizer'):
 
-        self.transformer = tf.keras.models.load_model(model_path, custom_objects = {'tf': tf, 'create_padding_mask': create_padding_mask, 'create_look_ahead_mask': create_look_ahead_mask});
+        self.transformer = tf.keras.models.load_model(model_path, custom_objects = {'tf': tf, 'ReLU': tf.keras.layers.ReLU});
         self.tokenizer = tfds.features.text.SubwordTextEncoder.load_from_file(tokenizer_prefix);
         self.start_token, self.end_token = [self.tokenizer.vocab_size], [self.tokenizer.vocab_size + 1];
 
